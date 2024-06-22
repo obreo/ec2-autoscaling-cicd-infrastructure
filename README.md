@@ -8,7 +8,7 @@
 
 ## Overview
 
-This tutorial explains how to deploy a scalable, highly available EC2 infrastrucutre, based on a custom AMI image, and supports continues integration/continues delivery (CI/CD) deployment with blue / green strategy, integrated with multi environments using a shared application load balancer, or dedicated backed by CloudFront distribution.
+This tutorial explains how to deploy a scalable, highly available EC2 infrastructure, based on a custom AMI image, that supports continues integration/continues delivery (CI/CD) deployment with blue / green strategy, integrated with multi environments using a shared application load balancer, or dedicated backed by CloudFront distribution.
 
 This infrastructure depends on a VPC of two subnets to run application instances, attached to a route table that uses Internet gateway, having EC2 instances deployed by an autoscaling group, that uses an application load balancer and a launch template, which uses a custome EC2 image based on Amazon Linux 2023 - built by EC2 Image Builder - which supports AWS CodeDeploy-Agent, AWS CloudWatch-Agent, NodeJS runtime and Docker engine.
 
