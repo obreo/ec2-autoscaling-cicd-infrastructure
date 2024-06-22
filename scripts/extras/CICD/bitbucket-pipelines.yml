@@ -1,0 +1,136 @@
+image: node:18-alpine
+pipelines:
+  branches:
+# https://bitbucket.org/atlassian/aws-code-deploy/src/master/
+# AWS user credentials/OIDC require S3 access to the bucket, CodeDeploy with EC2 Access + CodeDeploy Policy, SSM Parameters by Path policy
+    automation:
+      - step:
+          name: Deploying, Building, Pushing to S3, then Deploying to CodeDeploy
+          script:
+            - echo "Calling SSM Parameters"
+            - apk add aws-cli zip
+            - mkdir -p /root/.aws
+            - |
+              echo -e "[default]
+              aws_access_key_id = $AWS_ACCESS_KEY_ID
+              aws_secret_access_key = $AWS_SECRET_ACCESS_KEY" > /root/.aws/credentials
+            - |
+              echo -e "[default]
+              region = $AWS_DEFAULT_REGION" > /root/.aws/config
+            - |
+              aws ssm get-parameters-by-path --path "$PARAMETERS_PATH" --with-decryption --query "Parameters[*].[Name,Value]" --output text 2>> /var/log/error.log | while read -r name value; do
+                export_string="${name##*/}=$value"
+                echo "$export_string" >> .env
+              done
+            - npm install -f
+            - npm run build
+            - rm .env
+            - zip -r <APPLICATION_NAME>.zip public node_modules package.json scripts appspec.yml
+            #- find . -type f -exec zip <APPLICATION_NAME>.zip {} +
+          artifacts:
+            - <APPLICATION_NAME>.zip
+
+      - step:
+          oidc: true
+          name: Pushing to S3 Bucket
+          script:
+            # Upload artifact to S3
+            - pipe: atlassian/aws-code-deploy:1.5.0
+              variables:
+                #AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                #AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_OIDC_ROLE_ARN: 'arn:aws:iam::N:role/OIDC'
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                S3_BUCKET: $S3_BUCKET
+                FOLDER: artifacts/
+                COMMAND: 'upload'
+                APPLICATION_NAME: $APPLICATION_NAME
+                ZIP_FILE: '<APPLICATION_NAME>.zip'
+                VERSION_LABEL: <APPLICATION_NAME>.zip
+
+      - step:
+          oidc: true
+          name: Deploying with CodeDeploy
+          script:
+            # Deploy to CodeDeploy
+            - pipe: atlassian/aws-code-deploy:1.5.0
+              variables:
+                #AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                #AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_OIDC_ROLE_ARN: 'arn:aws:iam::N:role/OIDC'
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                S3_BUCKET: $S3_BUCKET
+                FOLDER: artifacts/
+                COMMAND: 'deploy'
+                APPLICATION_NAME: $APPLICATION_NAME
+                DEPLOYMENT_GROUP: $DEPLOYMENT_GROUP
+                IGNORE_APPLICATION_STOP_FAILURES: 'true'
+                FILE_EXISTS_BEHAVIOR: 'OVERWRITE'
+                WAIT: 'true'
+                VERSION_LABEL: <APPLICATION_NAME>.zip
+
+    automation-staging:
+          - step:
+              name: Deploying, Building, Pushing to S3, then Deploying to CodeDeploy
+              script:
+                - echo "Calling SSM Parameters"
+                - apk add aws-cli zip
+                - mkdir -p /root/.aws
+                - |
+                  echo -e "[default]
+                  aws_access_key_id = $AWS_ACCESS_KEY_ID
+                  aws_secret_access_key = $AWS_SECRET_ACCESS_KEY" > /root/.aws/credentials
+                - |
+                  echo -e "[default]
+                  region = $AWS_DEFAULT_REGION" > /root/.aws/config
+                - |
+                  aws ssm get-parameters-by-path --path "$PARAMETERS_PATH" --with-decryption --query "Parameters[*].[Name,Value]" --output text 2>> /var/log/error.log | while read -r name value; do
+                    export_string="${name##*/}=$value"
+                    echo "$export_string" >> .env
+                  done
+                - npm install -f
+                - npm run build
+                - rm .env
+                - zip -r <APPLICATION_NAME>.zip public node_modules package.json scripts appspec.yml
+                #- find . -type f -exec zip <APPLICATION_NAME> {} +
+              artifacts:
+                - <APPLICATION_NAME>.zip
+
+          - step:
+              oidc: true
+              name: Pushing to S3 Bucket
+              script:
+                # Upload artifact to S3
+                - pipe: atlassian/aws-code-deploy:1.5.0
+                  variables:
+                    #AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                    #AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                    AWS_OIDC_ROLE_ARN: 'arn:aws:iam::N:role/OIDC'
+                    AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                    S3_BUCKET: $S3_BUCKET
+                    FOLDER: artifacts/staging
+                    COMMAND: 'upload'
+                    APPLICATION_NAME: $APPLICATION_NAME_STAGING
+                    ZIP_FILE: '<APPLICATION_NAME>.zip'
+                    VERSION_LABEL: <APPLICATION_NAME>.zip
+
+          - step:
+              oidc: true
+              name: Deploying with CodeDeploy
+              script:
+                # Deploy to CodeDeploy
+                - pipe: atlassian/aws-code-deploy:1.5.0
+                  variables:
+                    #AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                    #AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                    AWS_OIDC_ROLE_ARN: 'arn:aws:iam::N:role/OIDC'
+                    AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                    S3_BUCKET: $S3_BUCKET
+                    FOLDER: artifacts/staging
+                    COMMAND: 'deploy'
+                    APPLICATION_NAME: $APPLICATION_NAME_STAGING
+                    DEPLOYMENT_GROUP: $DEPLOYMENT_GROUP_STAGING
+                    IGNORE_APPLICATION_STOP_FAILURES: 'true'
+                    FILE_EXISTS_BEHAVIOR: 'OVERWRITE'
+                    WAIT: 'true'
+                    VERSION_LABEL: <APPLICATION_NAME>.zip

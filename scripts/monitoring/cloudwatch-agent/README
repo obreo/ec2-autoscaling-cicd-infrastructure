@@ -1,0 +1,11 @@
+config.json is stored in the following directory in EC2:
+/opt/aws/amazon-cloudwatch-agent/bin/config.json
+
+
+To generate a new log file:
+./opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-config-wizard
+
+
+Then start cloudwatch agent
+# Starting CloudWatch agent with the generated file
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json

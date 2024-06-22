@@ -1,0 +1,126 @@
+# Staging
+# Uncontainerized - nodejs:
+    version: 0.2
+    env:
+      variables:
+        SSM_PATH: "${var.Staging_PARAMETERS_PATH}"
+    phases:
+      install:
+        runtime-versions:
+          nodejs: 20
+      pre_build:
+        commands:
+          - echo Calling Parameters
+          - while read -r name value; do export_string="$${name##*/}=$value"; export "$export_string"; done < <(aws ssm get-parameters-by-path --path "$${SSM_PATH}" --with-decryption --query "Parameters[*].[Name,Value]" --output text)
+          - echo installing dependencies
+          - npm install -f
+      build:
+        commands:
+          - echo Building application
+          - npm run build
+
+    artifacts:
+      files:
+        - '**/*'
+        - scripts/*
+        - appspec.yml
+      base-directory: "."
+
+    #cache:
+    #  paths:
+    #    - /root/.npm/**/*
+    #    - node_modules/**/*
+
+    # Containerized:
+     # This buildspec.yml script will build dockerfile of apache and update it with the static files, then push it to the ECR registry, it will then update the appspec.yml file with the new image version, and export it to s3 as an artifact.
+      # Make sure that CodeBuild has role to access all the resources mentioned in this script so it can use aws api with authentication.
+      
+      version: 0.2
+      phases:
+        pre_build:
+          commands:
+            # Log in ECR
+            - aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${var.account_id}.dkr.ecr.${var.region}.amazonaws.com
+        build:
+          commands:
+            # Building Dockerfile
+            - echo  'Building Image'
+            - docker build -t ${var.name} .
+            - echo 'Tagging image'
+            - docker tag ${var.name}:latest ${var.account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.ecr_name}:$${CODEBUILD_BUILD_NUMBER}
+        post_build:
+          commands:
+            # Pushing image to repository
+            - echo 'Pushing Image to ECR registry'
+            - docker push ${var.account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.ecr_name}:$${CODEBUILD_BUILD_NUMBER}
+            # Updating before_install.sh file with the new build number tag
+            - echo 'Updating before_install.sh file with the new build number tag'
+            - |
+                sed -i "s|<IMAGE>|${var.account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.ecr_name}:$${CODEBUILD_BUILD_NUMBER}|g" scripts/before_install.sh
+      artifacts:
+        files:
+          - '**/*'
+
+
+# Production
+# uncontainerized
+version: 0.2
+    env:
+      variables:
+        SSM_PATH: "${var.Main_PARAMETERS_PATH}"
+    phases:
+      install:
+        runtime-versions:
+          nodejs: 20
+      pre_build:
+        commands:
+          - echo Calling Parameters
+          - while read -r name value; do export_string="$${name##*/}=$value"; export "$export_string"; done < <(aws ssm get-parameters-by-path --path "$${SSM_PATH}" --with-decryption --query "Parameters[*].[Name,Value]" --output text)
+          - echo installing dependencies
+          - npm install -f
+      build:
+        commands:
+          - echo Building application
+          - npm run build
+
+    artifacts:
+      files:
+        - '**/*'
+        - scripts/*
+        - appspec.yml
+      base-directory: "."
+
+    #cache:
+    #  paths:
+    #    - /root/.npm/**/*
+    #    - node_modules/**/*
+
+    # Containerized:
+    # This buildspec.yml script will build dockerfile of apache and update it with the static files, then push it to the ECR registry, it will then update the appspec.yml file with the new image version, and export it to s3 as an artifact.
+      # Make sure that CodeBuild has role to access all the resources mentioned in this script so it can use aws api with authentication.
+      
+      version: 0.2
+      phases:
+        pre_build:
+          commands:
+            # Log in ECR
+            - aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${var.account_id}.dkr.ecr.${var.region}.amazonaws.com
+        build:
+          commands:
+            # Building Dockerfile
+            - echo  'Building Image'
+            - docker build -t ${var.name} .
+            - echo 'Tagging image'
+            - docker tag ${var.name}:latest ${var.account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.ecr_name}:$${CODEBUILD_BUILD_NUMBER}
+        post_build:
+          commands:
+            # Pushing image to repository
+            - echo 'Pushing Image to ECR registry'
+            - docker push ${var.account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.ecr_name}:$${CODEBUILD_BUILD_NUMBER}
+            # Updating before_install.sh file with the new build number tag
+            - echo 'Updating before_install.sh file with the new build number tag'
+            - |
+                sed -i "s|<IMAGE>|${var.account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.ecr_name}:$${CODEBUILD_BUILD_NUMBER}|g" scripts/before_install.sh
+      artifacts:
+        files:
+          - '**/*'
