@@ -18,15 +18,15 @@ This Insfrastructure runs a CICD deployment using codepipeline that triggers a C
 
 ## Brief Intro - Why and How?
 
-Deploying Autoscalable EC2 infrastructure integrated with CI/CD pipelines from the scratch is not the best idea considering its complexity and the amount of resources required to manage such infrastructure. But it is useful when it is desired to have a complete control over the infrastructure. 
+Deploying an Autoscalable EC2 infrastructure integrated with CI/CD pipelines from the scratch is not the best idea, considering its complexity and the amount of resources required to manage such setup. But it is useful when it is required to have a complete control over it.
 
-While implementing this setup, I realised I was implementing that Elastic Beanstalk is already delivering. In fact, Elastic Beanstalk is typically based on such backend infrastructure from a base image which includes codedeploy-agent to deliver and run the application, CloudWatch agent to deliver metrics and logs, Nginx to deliver proxy server, and the software runtime that will run the application's code.
+While implementing this setup, I realized I was implementing what Elastic Beanstalk is already delivering. In fact, Elastic Beanstalk is typically based on a similar backend, from a base image which includes codedeploy-agent to deliver and run the application, CloudWatch agent to deliver metrics and logs, Nginx to deliver proxy server, and the software runtime that will run the application's code.
 
-It uses application load balancer that is either dedicated, or shared using hostname rules baed on Alias records that route the custom domain name to the application load balancer's endpoint. It also uses S3 Bucket which stores the application's code for deployment.
+It uses application load balancer that is either dedicated, or shared using host-name rules based on Alias records that route the custom domain name to the application load balancer endpoint. It also uses an S3 Bucket to store the application's compiled code for deployment.
 
-One of the main issues of elastic beanstalk is the slow deployment process, and this process of building the application, pushing it as an artifact to s3 bucket, then retrieving it for deployment to the ec2 instances and waitng for health checks explains the slow deployment process.
+One of the main issues of Elastic beanstalk is the slow deployment process, and the process of building the application, pushing it as an artifact to s3 bucket, then retrieving it for deployment to the ec2 instances and waiting for health checks explains the slow deployment process.
 
-But another reason to build an Autoscalable EC2 infrastructure instead of Elastic Beanstalk is the later has 500mb application size limit, which is enough especially if the application uses isolated infrastructure for each of Frontend and Backend.
+But another reason to build an auto scalable EC2 infrastructure instead of Elastic Beanstalk is the later has 500mb application size limit, which is enough especially if the application uses isolated infrastructure for the frontend and backend.
 
 ## Setup
 
